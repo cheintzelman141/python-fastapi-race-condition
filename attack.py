@@ -4,8 +4,11 @@ import httpx
 BASE_URL = "http://127.0.0.1:8000"
 
 async def buy_item(client, endpoint):
-    response = await client.post(f"{BASE_URL}/{endpoint}")
-    return response.json()
+    try:
+        response = await client.post(f"{BASE_URL}/{endpoint}")
+        return response.json()
+    except:
+        return {"status": "error"}
 
 async def get_stock(client):
     response = await client.get(f"{BASE_URL}/status")
@@ -32,16 +35,20 @@ async def run_attack(endpoint):
         end_stock = await get_stock(client)
         
         print(f"📊 Results:")
-        print(f"   - Successful 'Buys': {success_count}")
+        print(f"   - Successful 'Buys': {success_count} (Expected: 1)")
         print(f"   - Final Stock Count: {end_stock}")
 
-        if end_stock < 0:
-            print("\n❌ RACE CONDITION SUCCESSFUL!")
-            print(f"   We sold {success_count} items but only had 1.")
-            print(f"   Inventory is corrupted (Stock: {end_stock})")
+        # THE FIX: We fail if we sold more than 1 item OR if stock is negative
+        if success_count > 1 or end_stock < 0:
+            print("\n❌ RACE CONDITION DETECTED!")
+            print(f"   FAILURE: We sold {success_count} items but only had 1 in stock.")
+            if end_stock >= 0:
+                 print("   (Type: Lost Update - Everyone read '1' and wrote '0')")
+            else:
+                 print(f"   (Type: Negative Balance - Inventory is {end_stock})")
         else:
             print("\n✅ SECURE.")
-            print(f"   We correctly sold {1} item.")
+            print(f"   We correctly sold {success_count} item.")
             print("   Inventory is safe.")
 
 async def main():
